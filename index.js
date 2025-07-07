@@ -6,25 +6,37 @@ class Card {
 }
 
 const drawCardBtn = document.getElementById("drawCardBtn");
+const stopPlayBtn = document.getElementById("stopPlayBtn");
+const newGameBtn = document.getElementById("newGameBtn");
 const sumEl = document.getElementById("sum-el");
 const cardsEl = document.getElementById("cards-el");
+const dealerCardsEl = document.getElementById("dealerCards-el");
 const playerEl = document.getElementById("player-el");
 
-document.getElementById("newGameBtn").addEventListener('click', startGame);
+newGameBtn.addEventListener('click', startGame);
 drawCardBtn.addEventListener('click', drawCard);
+stopPlayBtn.addEventListener('click', stopPlay);
 
 const deck = [];
-let myCurrentHand = [];
+let playState = { playerHand: [], playerSum: 0, dealerHand: [], dealerSum: 0 };
 
 function startGame() {
-    console.log("start Game");
     initDeck();
-    drawCardBtn.disabled = false;
+    changePlayState(false);
     playerEl.textContent = "";
-    myCurrentHand = [];
-    myCurrentHand.push(deck.pop());
-    myCurrentHand.push(deck.pop());
-    renderGame();
+
+    // init current player hand
+    playState.playerHand.length = 0;
+    playState.playerHand.push(deck.pop());
+    playState.playerHand.push(deck.pop());
+
+    // dealer hand
+    playState.dealerHand.length = 0;
+    playState.dealerHand.push(deck.pop());
+    playState.dealerHand.push(deck.pop());
+    dealerCardsEl.textContent = playState.dealerHand[0].text + " #";
+
+    renderPlayer();
     document.getElementById("gameArea").style.display = "block";
 }
 
@@ -34,28 +46,90 @@ function drawCard() {
         return;
     }
 
-    myCurrentHand.push(deck.pop());
-    renderGame();
+    playState.playerHand.push(deck.pop());
+    renderPlayer();
 }
 
-function renderGame() {
+function stopPlay() {
+    changePlayState(true);
+    console.log("stop play");
+    setTimeout(dealerTurn, 1000);
+}
+
+function dealerTurn() {
+    // display cards
+    dealerCardsEl.classList.add("card-flash");
+    renderCards(dealerCardsEl, playState.dealerHand);
+    playState.dealerSum = calculateHandValue(playState.dealerHand);
+    setTimeout(() => { dealerCardsEl.classList.remove("card-flash"); }, 1000);
+
+    // check status
+    if (playState.dealerSum >= 17) {
+        finishRound();
+        return;
+    }
+
+    setTimeout(() => {
+        playState.dealerHand.push(deck.pop());
+        dealerTurn(); 
+    }, 1000);
+}
+
+function renderCards(domElement, cardsArray) {
+    cardsText = "";
+    for (const element of cardsArray) {
+        cardsText += element.text + " "; 
+    }
+
+    domElement.textContent = cardsText;
+}
+
+function calculateHandValue(cardsArray) {
     let sum = 0;
-    cardsEl.textContent = "";
-    for (const element of myCurrentHand) {
+    for (const element of cardsArray) {
         sum += element.value;
-        cardsEl.textContent += element.text + " "; 
     }
-    sumEl.textContent = sum;
+    return sum;
+}
 
-    if (sum >= 21) {
-        stopGame(sum);
+function renderPlayer() {
+    renderCards(cardsEl, playState.playerHand);
+    playState.playerSum = calculateHandValue(playState.playerHand);
+    sumEl.textContent = playState.playerSum;
+
+    if (playState.playerSum >= 21) {
+        stopGame();
     }
 }
 
-function stopGame(sum) {
-    var msg = sum == 21 ? "Blackjack!" : "Bust!";
+function stopGame() {
+    var msg = playState.playerSum === 21 ? "Blackjack!" : "Bust!";
     playerEl.textContent = msg;
-    drawCardBtn.disabled = true;
+    changePlayState(true);
+    if (playState.playerSum === 21) {
+        setTimeout(dealerTurn(), 1000);
+    }
+}
+
+function changePlayState(state) {
+    drawCardBtn.disabled = state;
+    stopPlayBtn.disabled = state;
+}
+
+function finishRound() {
+    let msg = "";
+    if (playState.dealerSum > 21) {
+        msg = "Dealer busted ! You won this hand";
+    }
+    else if (playState.playerSum > playState.dealerSum) {
+        msg = `You won with ${playState.playerSum} against dealer ${playState.dealerSum}`;
+    } else if (playState.playerSum < playState.dealerSum) {
+        msg = `You lost with ${playState.playerSum} against dealer ${playState.dealerSum}`;
+    } else {
+        msg = `DRAW ! Same cards values: ${playState.playerSum}`;
+    }
+
+    playerEl.textContent = msg;
 }
 
 function initDeck() {
