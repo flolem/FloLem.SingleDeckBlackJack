@@ -1,7 +1,17 @@
 class Card {
-    constructor(value, text) {
-        this.value = value;
-        this.text = text;
+    constructor(rank, suit) {
+        this.rank = rank;
+        this.suit = suit;
+    }
+
+    get text() {
+        return `[${this.rank}${this.suit}]`;
+    }
+
+    get value() {
+        if (this.rank === "A") return 11;
+        if (["K", "Q", "J"].includes(this.rank)) return 10;
+        return Number(this.rank);
     }
 }
 
@@ -19,8 +29,11 @@ stopPlayBtn.addEventListener('click', stopPlay);
 
 const deck = [];
 let playState = { playerHand: [], playerSum: 0, dealerHand: [], dealerSum: 0 };
+let dealerStarted = false;
 
+// ============ FUNCTIONS START HERE ===================
 function startGame() {
+    dealerStarted = false;
     initDeck();
     changePlayState(false);
     playerEl.textContent = "";
@@ -34,7 +47,7 @@ function startGame() {
     playState.dealerHand.length = 0;
     playState.dealerHand.push(deck.pop());
     playState.dealerHand.push(deck.pop());
-    dealerCardsEl.textContent = playState.dealerHand[0].text + " #";
+    dealerCardsEl.textContent = playState.dealerHand[0].text + "[?]";
 
     renderPlayer();
     document.getElementById("gameArea").style.display = "block";
@@ -53,15 +66,19 @@ function drawCard() {
 function stopPlay() {
     changePlayState(true);
     console.log("stop play");
-    setTimeout(dealerTurn, 1000);
+    if (! dealerStarted) {
+        setTimeout(dealerTurn, 1000);
+    }
 }
 
+// ---------- INTERNAL FUNCTIONS ----------
 function dealerTurn() {
+    dealerStarted = true;
     // display cards
     dealerCardsEl.classList.add("card-flash");
     renderCards(dealerCardsEl, playState.dealerHand);
     playState.dealerSum = calculateHandValue(playState.dealerHand);
-    setTimeout(() => { dealerCardsEl.classList.remove("card-flash"); }, 1000);
+    setTimeout(() => { dealerCardsEl.classList.remove("card-flash"); }, 800);
 
     // check status
     if (playState.dealerSum >= 17) {
@@ -72,13 +89,13 @@ function dealerTurn() {
     setTimeout(() => {
         playState.dealerHand.push(deck.pop());
         dealerTurn(); 
-    }, 1000);
+    }, 800);
 }
 
 function renderCards(domElement, cardsArray) {
-    cardsText = "";
+    let cardsText = "";
     for (const element of cardsArray) {
-        cardsText += element.text + " "; 
+        cardsText += element.text; 
     }
 
     domElement.textContent = cardsText;
@@ -86,9 +103,17 @@ function renderCards(domElement, cardsArray) {
 
 function calculateHandValue(cardsArray) {
     let sum = 0;
+    let aceCount = 0;
     for (const element of cardsArray) {
         sum += element.value;
+        if (element.rank === "A") aceCount++;
     }
+
+    while (sum > 21 && aceCount) {
+        sum -= 10;
+        aceCount--;
+    }
+    
     return sum;
 }
 
@@ -103,11 +128,13 @@ function renderPlayer() {
 }
 
 function stopGame() {
+    changePlayState(true);
     var msg = playState.playerSum === 21 ? "Blackjack!" : "Bust!";
     playerEl.textContent = msg;
-    changePlayState(true);
     if (playState.playerSum === 21) {
-        setTimeout(dealerTurn(), 1000);
+        if (! dealerStarted) {
+            setTimeout(dealerTurn, 1000);
+        }
     }
 }
 
@@ -138,14 +165,7 @@ function initDeck() {
     const ranks = ["A", 2,3,4,5,6,7,8,9,10,"J", "Q", "K"];
     for (const suit of suits) {
         for (const rank of ranks) {
-            let value = rank;
-            if (rank === "J" || rank === "Q" || rank === "K") {
-                value = 10;
-            }
-            if (rank === "A") {
-                value = 11;
-            }
-            deck.push(new Card(value, rank+suit))
+            deck.push(new Card(rank, suit));
         }
     }
 
