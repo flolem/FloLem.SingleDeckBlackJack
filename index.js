@@ -1,5 +1,5 @@
 /* PLAN
-MVP4: persistent deck / new hand button + minor stats
+MVP4: persistent deck / new hand button + minor stats : DONE
 MVP5: Betting & money system
 MVP6: advanced actions like Double or Split
 MVP7: polish ?
@@ -22,21 +22,23 @@ class Card {
     }
 }
 
-const drawCardBtn = document.getElementById("drawCardBtn");
-const stopPlayBtn = document.getElementById("stopPlayBtn");
-const newGameBtn = document.getElementById("newGameBtn");
-const newPlayBtn = document.getElementById("newPlayBtn");
-const sumEl = document.getElementById("sum-el");
-const cardsEl = document.getElementById("cards-el");
-const dealerCardsEl = document.getElementById("dealerCards-el");
-const playerEl = document.getElementById("player-el");
-const deckInfoEl = document.getElementById("deckInfo");
-const statsEl = document.getElementById("statsAreaEl");
+const dom = {
+    drawCardBtn: document.getElementById("drawCardBtn"),
+    stopPlayBtn: document.getElementById("stopPlayBtn"),
+    newGameBtn: document.getElementById("newGameBtn"),
+    newPlayBtn: document.getElementById("newPlayBtn"),
+    sumEl: document.getElementById("sum-el"),
+    cardsEl: document.getElementById("cards-el"),
+    dealerCardsEl: document.getElementById("dealerCards-el"),
+    playerEl:document.getElementById("player-el"),
+    deckInfoEl: document.getElementById("deckInfo"),
+    statsEl: document.getElementById("statsAreaEl")
+}
 
-newGameBtn.addEventListener('click', startGame);
-drawCardBtn.addEventListener('click', drawCard);
-stopPlayBtn.addEventListener('click', stopPlay);
-newPlayBtn.addEventListener('click', newPlay);
+dom.newGameBtn.addEventListener('click', startGame);
+dom.drawCardBtn.addEventListener('click', drawCard);
+dom.stopPlayBtn.addEventListener('click', stopPlay);
+dom.newPlayBtn.addEventListener('click', newPlay);
 
 let playState = { 
     player: {
@@ -71,36 +73,40 @@ function startGame() {
 }
 
 function newPlay() {
-    newPlayBtn.disabled = true;
-    if (gameState.deck.length <= 52 - gameState.cutCardIndex) {
+    dom.newPlayBtn.disabled = true;
+    if (isCutCardReached()) {
         initDeck();
-        playerEl.textContent = "Deck reshuffled";
+        dom.playerEl.textContent = "Deck reshuffled";
     } else {
-        playerEl.textContent = "";
+        dom.playerEl.textContent = "";
     }
 
     // init current player hand
     playState.player.cards.length = 0;
-    playState.player.cards.push(gameState.deck.pop());
-    playState.player.cards.push(gameState.deck.pop());
+    playState.player.cards.push(drawFromDeck());
+    playState.player.cards.push(drawFromDeck());
 
     // dealer hand
     playState.dealer.cards.length = 0;
-    playState.dealer.cards.push(gameState.deck.pop());
-    playState.dealer.cards.push(gameState.deck.pop());
-    dealerCardsEl.textContent = playState.dealer.cards[0].text + "[?]";
+    playState.dealer.cards.push(drawFromDeck());
+    playState.dealer.cards.push(drawFromDeck());
+    dom.dealerCardsEl.textContent = playState.dealer.cards[0].text + "[?]";
 
-    renderPlayer();
     disableActionButtons(false);
     dealerStarted = false;
+    renderPlayer();   
+}
+
+function isCutCardReached() {
+    return gameState.deck.length <= 52 - gameState.cutCardIndex;
 }
 
 function drawCard() {
-    if (drawCardBtn.disabled) {
+    if (dom.drawCardBtn.disabled) {
         return;
     }
 
-    playState.player.cards.push(gameState.deck.pop());
+    playState.player.cards.push(drawFromDeck());
     renderPlayer();
 }
 
@@ -115,10 +121,10 @@ function stopPlay() {
 function dealerTurn() {
     dealerStarted = true;
     // display cards
-    dealerCardsEl.classList.add("card-flash");
-    renderCards(dealerCardsEl, playState.dealer.cards);
+    dom.dealerCardsEl.classList.add("card-flash");
+    renderCards(dom.dealerCardsEl, playState.dealer.cards);
     playState.dealer.sum = calculateHandValue(playState.dealer.cards);
-    setTimeout(() => { dealerCardsEl.classList.remove("card-flash"); }, 800);
+    setTimeout(() => { dom.dealerCardsEl.classList.remove("card-flash"); }, 800);
 
     // check status
     if (playState.dealer.sum >= 17) {
@@ -127,13 +133,13 @@ function dealerTurn() {
     }
 
     setTimeout(() => {
-        playState.dealer.cards.push(gameState.deck.pop());
+        playState.dealer.cards.push(drawFromDeck());
         dealerTurn(); 
     }, 800);
 }
 
 function renderCards(domElement, cardsArray) {
-    deckInfoEl.textContent = "🂠 " + gameState.deck.length;
+    dom.deckInfoEl.textContent = "🂠 " + gameState.deck.length;
     let cardsText = "";
     for (const element of cardsArray) {
         cardsText += element.text; 
@@ -158,10 +164,14 @@ function calculateHandValue(cardsArray) {
 }
 
 function renderPlayer() {
-    renderCards(cardsEl, playState.player.cards);
+    renderCards(dom.cardsEl, playState.player.cards);
     playState.player.sum = calculateHandValue(playState.player.cards);
-    sumEl.textContent = playState.player.sum;
+    dom.sumEl.textContent = playState.player.sum;
 
+    checkPlayerState() 
+}
+
+function checkPlayerState() {
     if (playState.player.sum > 21) {
         disableActionButtons(true);
         finishRound();
@@ -169,18 +179,17 @@ function renderPlayer() {
 
     if (playState.player.sum === 21) {
         if (playState.player.cards.length === 2) {
-            playerEl.textContent = "You have a Blackjack !";
+            dom.playerEl.textContent = "You have a Blackjack !";
         }
 
         disableActionButtons(true);
         setTimeout(dealerTurn, 1000);  
     }
-
 }
 
 function disableActionButtons(state) {
-    drawCardBtn.disabled = state;
-    stopPlayBtn.disabled = state;
+    dom.drawCardBtn.disabled = state;
+    dom.stopPlayBtn.disabled = state;
 }
 
 function isBlackjack(hand) {
@@ -205,16 +214,19 @@ function finishRound() {
     } else {
         if (isBlackjack(playState.player) && !isBlackjack(playState.dealer)) {
             msg = `You won with your Blackjack !`;
-        } else {
+        } else if (!isBlackjack(playState.player) && isBlackjack(playState.dealer)) {
+            msg = "Dealer has blackjack. You lose.";
+            gameWinner = "dealer";
+        }else {
             msg = `DRAW ! Same cards values: ${playState.player.sum}`;
             gameWinner = "draw";
         }
     }
 
     compileStats(gameWinner);
-    playerEl.textContent = msg;
-    newPlayBtn.disabled = false;
-    newPlayBtn.removeAttribute("style");;
+    dom.playerEl.textContent = msg;
+    dom.newPlayBtn.disabled = false;
+    dom.newPlayBtn.removeAttribute("style");;
 }
 
 function compileStats(gameWinner) {
@@ -241,12 +253,15 @@ function compileStats(gameWinner) {
     }
 
     let info = "";
-    for (const key in statistics) {
-        if (Object.prototype.hasOwnProperty.call(statistics, key)) {
-            info += `<li>${key} : ${statistics[key]}</li>`
-        }
+    for (const [key, value] of Object.entries(statistics)) {
+        info += `<li>${key} : ${value}</li>`;
     }
-    statsEl.innerHTML = info;
+    dom.statsEl.innerHTML = info;
+}
+
+function drawFromDeck() {
+    if (gameState.deck.length === 0) initDeck();
+    return gameState.deck.pop();
 }
 
 function initDeck() {
