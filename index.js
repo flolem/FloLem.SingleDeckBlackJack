@@ -4,6 +4,7 @@ MVP5: Betting & money system
 MVP6: advanced actions like Double or Split
 MVP7: polish ?
 */
+"use strict";
 
 class Card {
     constructor(rank, suit) {
@@ -127,7 +128,7 @@ function dealerTurn() {
     setTimeout(() => { dom.dealerCardsEl.classList.remove("card-flash"); }, 800);
 
     // check status
-    if (playState.dealer.sum >= 17) {
+    if (playState.dealer.sum >= 17 || isBlackjack(playState.player)) {
         finishRound();
         return;
     }
@@ -178,11 +179,17 @@ function checkPlayerState() {
     }
 
     if (playState.player.sum === 21) {
+        disableActionButtons(true);
         if (playState.player.cards.length === 2) {
             dom.playerEl.textContent = "You have a Blackjack !";
+            setTimeout(() => {
+                renderCards(dom.dealerCardsEl, playState.dealer.cards);
+                playState.dealer.sum = calculateHandValue(playState.dealer.cards);
+                finishRound();
+            }, 1000);
+            return;
         }
 
-        disableActionButtons(true);
         setTimeout(dealerTurn, 1000);  
     }
 }
@@ -199,7 +206,11 @@ function isBlackjack(hand) {
 function finishRound() {
     let msg = "";
     let gameWinner = "player";
-    if (playState.player.sum > 21) {
+
+    if (isBlackjack(playState.player) && !isBlackjack(playState.dealer)) {
+        msg = `You won with your Blackjack !`;
+    }
+    else if (playState.player.sum > 21) {
         msg = "You bust !"
         gameWinner = "dealer";
     }
@@ -211,22 +222,18 @@ function finishRound() {
     } else if (playState.player.sum < playState.dealer.sum) {
         msg = `You lost with ${playState.player.sum} against dealer ${playState.dealer.sum}`;
         gameWinner = "dealer";
-    } else {
-        if (isBlackjack(playState.player) && !isBlackjack(playState.dealer)) {
-            msg = `You won with your Blackjack !`;
-        } else if (!isBlackjack(playState.player) && isBlackjack(playState.dealer)) {
+    } else if (!isBlackjack(playState.player) && isBlackjack(playState.dealer)) {
             msg = "Dealer has blackjack. You lose.";
             gameWinner = "dealer";
-        }else {
+    }else {
             msg = `DRAW ! Same cards values: ${playState.player.sum}`;
             gameWinner = "draw";
         }
-    }
 
     compileStats(gameWinner);
     dom.playerEl.textContent = msg;
     dom.newPlayBtn.disabled = false;
-    dom.newPlayBtn.removeAttribute("style");;
+    dom.newPlayBtn.removeAttribute("style");
 }
 
 function compileStats(gameWinner) {
