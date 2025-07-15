@@ -135,7 +135,7 @@ function confirmBet() {
     playState.currentBet = bet;
     dom.betBtn.disabled = true;
     dom.betErrorEl.hidden = true;
-    currentBetEl.textContent = bet;
+    dom.currentBetEl.textContent = bet;
     gameState.money -= bet;
     dom.moneyInfoEl.textContent = gameState.money + "$";
     startNewPlay();
