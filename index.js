@@ -1,9 +1,13 @@
 /* PLAN
 MVP4: persistent deck / new hand button + minor stats : DONE
-MVP5: Betting & money system
+MVP5: Betting & money system : DONE
 MVP6: advanced actions like Double or Split
-MVP7: polish ?
+MVP7: polish (use sessionStorage / localStorage, etc.)
+
+sessionStorage.setItem("myState", JSON.stringify(gameState));
+let restored = JSON.parse(sessionStorage.getItem("myState"));
 */
+
 "use strict";
 
 class Card {
@@ -31,15 +35,25 @@ const dom = {
     sumEl: document.getElementById("sum-el"),
     cardsEl: document.getElementById("cards-el"),
     dealerCardsEl: document.getElementById("dealerCards-el"),
-    playerEl:document.getElementById("player-el"),
+    playerEl: document.getElementById("player-el"),
     deckInfoEl: document.getElementById("deckInfo"),
-    statsEl: document.getElementById("statsAreaEl")
+    moneyInfoEl: document.getElementById("moneyInfo"),
+    statsEl: document.getElementById("statsAreaEl"),
+    betBtn: document.getElementById("betBtn"),
+    betErrorEl: document.getElementById("betError"),
+    betForm: document.getElementById("betForm"),
+    playArea: document.getElementById("playArea"),
+    currentBetEl: document.getElementById("currentBetEl")
 }
 
 dom.newGameBtn.addEventListener('click', startGame);
 dom.drawCardBtn.addEventListener('click', drawCard);
 dom.stopPlayBtn.addEventListener('click', stopPlay);
 dom.newPlayBtn.addEventListener('click', newPlay);
+dom.betForm.addEventListener("submit", (e) => {
+    e.preventDefault(); // prevent page reload
+    confirmBet();
+});
 
 let playState = { 
     player: {
@@ -49,10 +63,11 @@ let playState = {
     dealer: {
         cards: [],
         sum: 0
-    }
+    },
+    currentBet: 0
 };
 let dealerStarted = false;
-let gameState = { deck: [], cutCardIndex: 0 };
+let gameState = { deck: [], cutCardIndex: 0, money: 500 };
 
 let statistics = {
     roundsPlayed: 0,
@@ -60,16 +75,19 @@ let statistics = {
     losses: 0,
     draws: 0,
     playerBlackjacks: 0,
-    dealerBlackjacks: 0
+    dealerBlackjacks: 0,
+    bestWon: 0,
+    worstLost: 0,
+    lastFive: "-"
 };
 
-// ============ FUNCTIONS START HERE ===================
+// ============ EVENT FUNCTIONS START HERE ===================
 function startGame() {
     dealerStarted = false;
     initDeck();
     disableActionButtons(false);
     
-    document.getElementById("gameArea").style.display = "block";
+    dom.betForm.hidden = false;
     newPlay();
 }
 
@@ -82,24 +100,13 @@ function newPlay() {
         dom.playerEl.textContent = "";
     }
 
-    // init current player hand
     playState.player.cards.length = 0;
-    playState.player.cards.push(drawFromDeck());
-    playState.player.cards.push(drawFromDeck());
-
-    // dealer hand
     playState.dealer.cards.length = 0;
-    playState.dealer.cards.push(drawFromDeck());
-    playState.dealer.cards.push(drawFromDeck());
-    dom.dealerCardsEl.textContent = playState.dealer.cards[0].text + "[?]";
 
-    disableActionButtons(false);
-    dealerStarted = false;
-    renderPlayer();   
-}
-
-function isCutCardReached() {
-    return gameState.deck.length <= 52 - gameState.cutCardIndex;
+    dom.betForm.hidden = false;
+    dom.playArea.hidden = true;
+    dom.betBtn.disabled = false;
+    dom.currentBetEl.textContent = "-";
 }
 
 function drawCard() {
@@ -118,7 +125,43 @@ function stopPlay() {
     }
 }
 
+function confirmBet() {
+    const bet = Number(document.getElementById("betAmount").value);
+    if (bet < 10 || bet > gameState.money || bet > 200 || bet % 2 != 0) {
+        dom.betErrorEl.hidden = false;
+        return;
+    }
+
+    playState.currentBet = bet;
+    dom.betBtn.disabled = true;
+    dom.betErrorEl.hidden = true;
+    currentBetEl.textContent = bet;
+    gameState.money -= bet;
+    dom.moneyInfoEl.textContent = gameState.money + "$";
+    startNewPlay();
+}
+
 // ---------- INTERNAL FUNCTIONS ----------
+function startNewPlay() { 
+    dom.betForm.hidden = true;
+    dom.playArea.hidden = false;
+    playState.player.cards.push(drawFromDeck());
+    playState.player.cards.push(drawFromDeck());
+   
+    playState.dealer.cards.push(drawFromDeck());
+    playState.dealer.cards.push(drawFromDeck());
+    playState.dealer.sum = calculateHandValue(playState.dealer.cards);
+    dom.dealerCardsEl.textContent = playState.dealer.cards[0].text + "[?]";
+
+    disableActionButtons(false);
+    dealerStarted = false;
+    renderPlayer();   
+}
+
+function isCutCardReached() {
+    return gameState.deck.length <= 52 - gameState.cutCardIndex;
+}
+
 function dealerTurn() {
     dealerStarted = true;
     // display cards
@@ -192,6 +235,11 @@ function checkPlayerState() {
 
         setTimeout(dealerTurn, 1000);  
     }
+
+    if (isBlackjack(playState.dealer)) {
+        disableActionButtons(true);
+        setTimeout(dealerTurn, 1000); 
+    }
 }
 
 function disableActionButtons(state) {
@@ -205,53 +253,61 @@ function isBlackjack(hand) {
 
 function finishRound() {
     let msg = "";
-    let gameWinner = "player";
+    let gameStatus = "W";
+    let moneyChange = 0;
 
     if (isBlackjack(playState.player) && !isBlackjack(playState.dealer)) {
+        moneyChange = playState.currentBet * 2.5;
         msg = `You won with your Blackjack !`;
     }
     else if (playState.player.sum > 21) {
         msg = "You bust !"
-        gameWinner = "dealer";
+        gameStatus = "L";
     }
     else if (playState.dealer.sum > 21) {
+        moneyChange = playState.currentBet * 2;
         msg = "Dealer busted ! You won this hand";
     }
     else if (playState.player.sum > playState.dealer.sum) {
+        moneyChange = playState.currentBet * 2;
         msg = `You won with ${playState.player.sum} against dealer ${playState.dealer.sum}`;
+    } else if (!isBlackjack(playState.player) && isBlackjack(playState.dealer)) {
+        msg = "Dealer has blackjack. You lost.";
+        gameStatus = "L";
     } else if (playState.player.sum < playState.dealer.sum) {
         msg = `You lost with ${playState.player.sum} against dealer ${playState.dealer.sum}`;
-        gameWinner = "dealer";
-    } else if (!isBlackjack(playState.player) && isBlackjack(playState.dealer)) {
-            msg = "Dealer has blackjack. You lose.";
-            gameWinner = "dealer";
-    }else {
+        gameStatus = "L";
+    } else {
+            moneyChange = playState.currentBet;
             msg = `DRAW ! Same cards values: ${playState.player.sum}`;
-            gameWinner = "draw";
+            gameStatus = "D";
         }
 
-    compileStats(gameWinner);
+    
+    gameState.money += moneyChange;
+    compileStats(gameStatus, moneyChange - playState.currentBet);
     dom.playerEl.textContent = msg;
     dom.newPlayBtn.disabled = false;
     dom.newPlayBtn.removeAttribute("style");
 }
 
-function compileStats(gameWinner) {
+function compileStats(gameStatus, moneyChange) {
     statistics.roundsPlayed++;
-    switch (gameWinner) {
-        case "player":
+    switch (gameStatus) {
+        case "W":
             statistics.wins++;
             break;
     
-        case "dealer":
+        case "L":
             statistics.losses++;
             break;
         
-        case "draw":
+        case "D":
             statistics.draws++;
             break;
     }
 
+    statistics.lastFive = (gameStatus + statistics.lastFive).slice(0, 5);
     if (isBlackjack(playState.player)) {
         statistics.playerBlackjacks++;
     }
@@ -259,11 +315,18 @@ function compileStats(gameWinner) {
         statistics.dealerBlackjacks++;
     }
 
+    if (moneyChange > statistics.bestWon) 
+        statistics.bestWon = moneyChange;
+    if (moneyChange < statistics.worstLost)
+        statistics.worstLost = moneyChange;
+
     let info = "";
     for (const [key, value] of Object.entries(statistics)) {
         info += `<li>${key} : ${value}</li>`;
     }
     dom.statsEl.innerHTML = info;
+
+    dom.moneyInfoEl.textContent = gameState.money + "$";
 }
 
 function drawFromDeck() {
