@@ -73,3 +73,13 @@ p {
     margin-bottom: 6px;
     font-size: 18px;
 }
+
+input:invalid {
+    border: 2px solid red;
+    background-color: #ffe6e6;
+}
+
+.error-message {
+    color: red;
+    font-size: 14px;
+}
