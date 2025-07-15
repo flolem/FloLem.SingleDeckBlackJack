@@ -23,10 +23,23 @@
                     <button id="newPlayBtn" style="display: none;" disabled>Play Again</button>
                 </div>
 
-                <div id="betInfo" hidden><p><label for="betAmount">Bet Amount:</label>
-                    <input type="number" id="betAmount" min="10" max="200" value="10" step="2" required><button id="betBtn">Confirm</button><br/>
-                    <small id="betError" class="error-message" hidden>Invalid bet amount (min= 10, max= 200 or your total of money, must be even)</small>
-                </p></div>
+                <form id="betForm" aria-labelledby="betLabel" hidden>
+                    <fieldset>
+                      <legend id="betLabel">Place Your Bet</legend>
+                  
+                      <label for="betAmount">Bet Amount:</label>
+                      <input type="number" id="betAmount" name="betAmount" min="10" max="200" step="2" value="10" required aria-describedby="betError">
+                  
+                      <button type="submit" id="betBtn">Confirm</button>
+                  
+                      <small id="betError"
+                             class="error-message"
+                             role="alert"
+                             hidden>
+                          Invalid bet amount (min: 10, max: 200, must be even and ≤ your money)
+                      </small>
+                    </fieldset>
+                  </form>
             </div>
             
         </div>

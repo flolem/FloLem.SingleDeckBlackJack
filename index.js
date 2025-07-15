@@ -1,6 +1,6 @@
 /* PLAN
 MVP4: persistent deck / new hand button + minor stats : DONE
-MVP5: Betting & money system
+MVP5: Betting & money system : DONE
 MVP6: advanced actions like Double or Split
 MVP7: polish (use sessionStorage / localStorage, etc.)
 
@@ -41,7 +41,7 @@ const dom = {
     statsEl: document.getElementById("statsAreaEl"),
     betBtn: document.getElementById("betBtn"),
     betErrorEl: document.getElementById("betError"),
-    betInfoArea: document.getElementById("betInfo"),
+    betForm: document.getElementById("betForm"),
     playArea: document.getElementById("playArea"),
     currentBetEl: document.getElementById("currentBetEl")
 }
@@ -50,7 +50,10 @@ dom.newGameBtn.addEventListener('click', startGame);
 dom.drawCardBtn.addEventListener('click', drawCard);
 dom.stopPlayBtn.addEventListener('click', stopPlay);
 dom.newPlayBtn.addEventListener('click', newPlay);
-dom.betBtn.addEventListener('click', confirmBet);
+dom.betForm.addEventListener("submit", (e) => {
+    e.preventDefault(); // prevent page reload
+    confirmBet();
+});
 
 let playState = { 
     player: {
@@ -84,7 +87,7 @@ function startGame() {
     initDeck();
     disableActionButtons(false);
     
-    dom.betInfoArea.hidden = false;
+    dom.betForm.hidden = false;
     newPlay();
 }
 
@@ -100,7 +103,7 @@ function newPlay() {
     playState.player.cards.length = 0;
     playState.dealer.cards.length = 0;
 
-    dom.betInfoArea.hidden = false;
+    dom.betForm.hidden = false;
     dom.playArea.hidden = true;
     dom.betBtn.disabled = false;
     dom.currentBetEl.textContent = "-";
@@ -140,7 +143,7 @@ function confirmBet() {
 
 // ---------- INTERNAL FUNCTIONS ----------
 function startNewPlay() { 
-    dom.betInfoArea.hidden = true;
+    dom.betForm.hidden = true;
     dom.playArea.hidden = false;
     playState.player.cards.push(drawFromDeck());
     playState.player.cards.push(drawFromDeck());
