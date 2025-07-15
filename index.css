@@ -47,3 +47,29 @@ p {
     0%   { transform: scale(1.2); opacity: 0.5; }
     100% { transform: scale(1); opacity: 1; }
 }
+
+
+#container {
+    display: flex;
+    justify-content: center;
+    gap: 60px;
+    max-width: 1200px;
+    margin: 0 auto;
+    align-items: flex-start;
+}
+
+#leftPanel {
+    text-align: left;
+    padding: 0 20px;
+}
+
+#statsAreaEl {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 20px;
+}
+
+#statsAreaEl li {
+    margin-bottom: 6px;
+    font-size: 18px;
+}

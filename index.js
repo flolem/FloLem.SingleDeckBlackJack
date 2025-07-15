@@ -1,3 +1,11 @@
+/* PLAN
+MVP4: persistent deck / new hand button + minor stats : DONE
+MVP5: Betting & money system
+MVP6: advanced actions like Double or Split
+MVP7: polish ?
+*/
+"use strict";
+
 class Card {
     constructor(rank, suit) {
         this.rank = rank;
@@ -15,57 +23,96 @@ class Card {
     }
 }
 
-const drawCardBtn = document.getElementById("drawCardBtn");
-const stopPlayBtn = document.getElementById("stopPlayBtn");
-const newGameBtn = document.getElementById("newGameBtn");
-const sumEl = document.getElementById("sum-el");
-const cardsEl = document.getElementById("cards-el");
-const dealerCardsEl = document.getElementById("dealerCards-el");
-const playerEl = document.getElementById("player-el");
+const dom = {
+    drawCardBtn: document.getElementById("drawCardBtn"),
+    stopPlayBtn: document.getElementById("stopPlayBtn"),
+    newGameBtn: document.getElementById("newGameBtn"),
+    newPlayBtn: document.getElementById("newPlayBtn"),
+    sumEl: document.getElementById("sum-el"),
+    cardsEl: document.getElementById("cards-el"),
+    dealerCardsEl: document.getElementById("dealerCards-el"),
+    playerEl:document.getElementById("player-el"),
+    deckInfoEl: document.getElementById("deckInfo"),
+    statsEl: document.getElementById("statsAreaEl")
+}
 
-newGameBtn.addEventListener('click', startGame);
-drawCardBtn.addEventListener('click', drawCard);
-stopPlayBtn.addEventListener('click', stopPlay);
+dom.newGameBtn.addEventListener('click', startGame);
+dom.drawCardBtn.addEventListener('click', drawCard);
+dom.stopPlayBtn.addEventListener('click', stopPlay);
+dom.newPlayBtn.addEventListener('click', newPlay);
 
-const deck = [];
-let playState = { playerHand: [], playerSum: 0, dealerHand: [], dealerSum: 0 };
+let playState = { 
+    player: {
+        cards: [],
+        sum: 0
+    },
+    dealer: {
+        cards: [],
+        sum: 0
+    }
+};
 let dealerStarted = false;
+let gameState = { deck: [], cutCardIndex: 0 };
+
+let statistics = {
+    roundsPlayed: 0,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    playerBlackjacks: 0,
+    dealerBlackjacks: 0
+};
 
 // ============ FUNCTIONS START HERE ===================
 function startGame() {
     dealerStarted = false;
     initDeck();
-    changePlayState(false);
-    playerEl.textContent = "";
+    disableActionButtons(false);
+    
+    document.getElementById("gameArea").style.display = "block";
+    newPlay();
+}
+
+function newPlay() {
+    dom.newPlayBtn.disabled = true;
+    if (isCutCardReached()) {
+        initDeck();
+        dom.playerEl.textContent = "Deck reshuffled";
+    } else {
+        dom.playerEl.textContent = "";
+    }
 
     // init current player hand
-    playState.playerHand.length = 0;
-    playState.playerHand.push(deck.pop());
-    playState.playerHand.push(deck.pop());
+    playState.player.cards.length = 0;
+    playState.player.cards.push(drawFromDeck());
+    playState.player.cards.push(drawFromDeck());
 
     // dealer hand
-    playState.dealerHand.length = 0;
-    playState.dealerHand.push(deck.pop());
-    playState.dealerHand.push(deck.pop());
-    dealerCardsEl.textContent = playState.dealerHand[0].text + "[?]";
+    playState.dealer.cards.length = 0;
+    playState.dealer.cards.push(drawFromDeck());
+    playState.dealer.cards.push(drawFromDeck());
+    dom.dealerCardsEl.textContent = playState.dealer.cards[0].text + "[?]";
 
-    renderPlayer();
-    document.getElementById("gameArea").style.display = "block";
+    disableActionButtons(false);
+    dealerStarted = false;
+    renderPlayer();   
+}
+
+function isCutCardReached() {
+    return gameState.deck.length <= 52 - gameState.cutCardIndex;
 }
 
 function drawCard() {
-    console.log("draw card");
-    if (drawCardBtn.disabled) {
+    if (dom.drawCardBtn.disabled) {
         return;
     }
 
-    playState.playerHand.push(deck.pop());
+    playState.player.cards.push(drawFromDeck());
     renderPlayer();
 }
 
 function stopPlay() {
-    changePlayState(true);
-    console.log("stop play");
+    disableActionButtons(true);
     if (! dealerStarted) {
         setTimeout(dealerTurn, 1000);
     }
@@ -75,29 +122,29 @@ function stopPlay() {
 function dealerTurn() {
     dealerStarted = true;
     // display cards
-    dealerCardsEl.classList.add("card-flash");
-    renderCards(dealerCardsEl, playState.dealerHand);
-    playState.dealerSum = calculateHandValue(playState.dealerHand);
-    setTimeout(() => { dealerCardsEl.classList.remove("card-flash"); }, 800);
+    dom.dealerCardsEl.classList.add("card-flash");
+    renderCards(dom.dealerCardsEl, playState.dealer.cards);
+    playState.dealer.sum = calculateHandValue(playState.dealer.cards);
+    setTimeout(() => { dom.dealerCardsEl.classList.remove("card-flash"); }, 800);
 
     // check status
-    if (playState.dealerSum >= 17) {
+    if (playState.dealer.sum >= 17 || isBlackjack(playState.player)) {
         finishRound();
         return;
     }
 
     setTimeout(() => {
-        playState.dealerHand.push(deck.pop());
+        playState.dealer.cards.push(drawFromDeck());
         dealerTurn(); 
     }, 800);
 }
 
 function renderCards(domElement, cardsArray) {
+    dom.deckInfoEl.textContent = "🂠 " + gameState.deck.length;
     let cardsText = "";
     for (const element of cardsArray) {
         cardsText += element.text; 
     }
-
     domElement.textContent = cardsText;
 }
 
@@ -113,63 +160,130 @@ function calculateHandValue(cardsArray) {
         sum -= 10;
         aceCount--;
     }
-    
+
     return sum;
 }
 
 function renderPlayer() {
-    renderCards(cardsEl, playState.playerHand);
-    playState.playerSum = calculateHandValue(playState.playerHand);
-    sumEl.textContent = playState.playerSum;
+    renderCards(dom.cardsEl, playState.player.cards);
+    playState.player.sum = calculateHandValue(playState.player.cards);
+    dom.sumEl.textContent = playState.player.sum;
 
-    if (playState.playerSum >= 21) {
-        stopGame();
-    }
+    checkPlayerState() 
 }
 
-function stopGame() {
-    changePlayState(true);
-    var msg = playState.playerSum === 21 ? "Blackjack!" : "Bust!";
-    playerEl.textContent = msg;
-    if (playState.playerSum === 21) {
-        if (! dealerStarted) {
-            setTimeout(dealerTurn, 1000);
+function checkPlayerState() {
+    if (playState.player.sum > 21) {
+        disableActionButtons(true);
+        finishRound();
+    }
+
+    if (playState.player.sum === 21) {
+        disableActionButtons(true);
+        if (playState.player.cards.length === 2) {
+            dom.playerEl.textContent = "You have a Blackjack !";
+            setTimeout(() => {
+                renderCards(dom.dealerCardsEl, playState.dealer.cards);
+                playState.dealer.sum = calculateHandValue(playState.dealer.cards);
+                finishRound();
+            }, 1000);
+            return;
         }
+
+        setTimeout(dealerTurn, 1000);  
     }
 }
 
-function changePlayState(state) {
-    drawCardBtn.disabled = state;
-    stopPlayBtn.disabled = state;
+function disableActionButtons(state) {
+    dom.drawCardBtn.disabled = state;
+    dom.stopPlayBtn.disabled = state;
+}
+
+function isBlackjack(hand) {
+    return hand.cards.length === 2 && hand.sum === 21;
 }
 
 function finishRound() {
     let msg = "";
-    if (playState.dealerSum > 21) {
+    let gameWinner = "player";
+
+    if (isBlackjack(playState.player) && !isBlackjack(playState.dealer)) {
+        msg = `You won with your Blackjack !`;
+    }
+    else if (playState.player.sum > 21) {
+        msg = "You bust !"
+        gameWinner = "dealer";
+    }
+    else if (playState.dealer.sum > 21) {
         msg = "Dealer busted ! You won this hand";
     }
-    else if (playState.playerSum > playState.dealerSum) {
-        msg = `You won with ${playState.playerSum} against dealer ${playState.dealerSum}`;
-    } else if (playState.playerSum < playState.dealerSum) {
-        msg = `You lost with ${playState.playerSum} against dealer ${playState.dealerSum}`;
-    } else {
-        msg = `DRAW ! Same cards values: ${playState.playerSum}`;
+    else if (playState.player.sum > playState.dealer.sum) {
+        msg = `You won with ${playState.player.sum} against dealer ${playState.dealer.sum}`;
+    } else if (playState.player.sum < playState.dealer.sum) {
+        msg = `You lost with ${playState.player.sum} against dealer ${playState.dealer.sum}`;
+        gameWinner = "dealer";
+    } else if (!isBlackjack(playState.player) && isBlackjack(playState.dealer)) {
+            msg = "Dealer has blackjack. You lose.";
+            gameWinner = "dealer";
+    }else {
+            msg = `DRAW ! Same cards values: ${playState.player.sum}`;
+            gameWinner = "draw";
+        }
+
+    compileStats(gameWinner);
+    dom.playerEl.textContent = msg;
+    dom.newPlayBtn.disabled = false;
+    dom.newPlayBtn.removeAttribute("style");
+}
+
+function compileStats(gameWinner) {
+    statistics.roundsPlayed++;
+    switch (gameWinner) {
+        case "player":
+            statistics.wins++;
+            break;
+    
+        case "dealer":
+            statistics.losses++;
+            break;
+        
+        case "draw":
+            statistics.draws++;
+            break;
     }
 
-    playerEl.textContent = msg;
+    if (isBlackjack(playState.player)) {
+        statistics.playerBlackjacks++;
+    }
+    if (isBlackjack(playState.dealer)) {
+        statistics.dealerBlackjacks++;
+    }
+
+    let info = "";
+    for (const [key, value] of Object.entries(statistics)) {
+        info += `<li>${key} : ${value}</li>`;
+    }
+    dom.statsEl.innerHTML = info;
+}
+
+function drawFromDeck() {
+    if (gameState.deck.length === 0) initDeck();
+    return gameState.deck.pop();
 }
 
 function initDeck() {
-    deck.length = 0;
+    gameState.deck.length = 0;
     const suits =  ["♠", "♥", "♣", "♦"];
     const ranks = ["A", 2,3,4,5,6,7,8,9,10,"J", "Q", "K"];
     for (const suit of suits) {
         for (const rank of ranks) {
-            deck.push(new Card(rank, suit));
+            gameState.deck.push(new Card(rank, suit));
         }
     }
 
-    shuffle(deck);
+    shuffle(gameState.deck);
+
+    gameState.cutCardIndex = 38 + Math.floor(Math.random() * 5);
 }
 
 // Fisher-Yates Shuffle Algorithm
